@@ -31,6 +31,15 @@ class Container
     /** @var array<string, bool> */
     private array $singletons = [];
 
+    /** @var array<string, \ReflectionClass> Process-lifetime reflection cache */
+    private static array $reflectionCache = [];
+
+    /** @var array<string, \ReflectionParameter[]> Process-lifetime constructor param cache */
+    private static array $paramCache = [];
+
+    /** @var array<string, true> Tracks classes currently being resolved — detects circular deps */
+    private array $building = [];
+
     public static function instance(): self
     {
         return self::$instance ??= new self();
@@ -127,15 +136,33 @@ class Container
             throw new \RuntimeException("Cannot resolve [{$class}]: class not found");
         }
 
-        $ref         = new \ReflectionClass($class);
-        $constructor = $ref->getConstructor();
-
-        if ($constructor === null) {
-            return new $class();
+        // Circular dependency guard
+        if (isset($this->building[$class])) {
+            $chain = implode(' → ', array_keys($this->building)) . ' → ' . $class;
+            throw new \RuntimeException("Circular dependency detected: {$chain}");
         }
 
-        $args = $this->resolveParams($constructor->getParameters(), $params);
-        return $ref->newInstanceArgs($args);
+        $this->building[$class] = true;
+
+        try {
+            // Use cached ReflectionClass — built once per process lifetime
+            if (!isset(self::$reflectionCache[$class])) {
+                self::$reflectionCache[$class] = new \ReflectionClass($class);
+                $constructor = self::$reflectionCache[$class]->getConstructor();
+                self::$paramCache[$class] = $constructor ? $constructor->getParameters() : null;
+            }
+
+            $ref = self::$reflectionCache[$class];
+
+            if (self::$paramCache[$class] === null) {
+                return new $class();
+            }
+
+            $args = $this->resolveParams(self::$paramCache[$class], $params);
+            return $ref->newInstanceArgs($args);
+        } finally {
+            unset($this->building[$class]);
+        }
     }
 
     /** @param \ReflectionParameter[] $parameters */

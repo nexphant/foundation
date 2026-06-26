@@ -20,6 +20,12 @@ use Nexphant\Validation\ValidationException;
  */
 class ControllerDispatcher
 {
+    /** @var array<string, \ReflectionMethod> Cache ReflectionMethod per class@method */
+    private static array $methodCache = [];
+
+    /** @var array<string, \ReflectionParameter[]> Cache parameter list per class@method */
+    private static array $paramCache = [];
+
     public function __construct(private readonly Container $container) {}
 
     /**
@@ -46,10 +52,17 @@ class ControllerDispatcher
 
     private function callMethod(object $controller, string $method, array $data, array $params): mixed
     {
-        $ref    = new \ReflectionMethod($controller, $method);
-        $args   = [];
+        $cacheKey = get_class($controller) . '@' . $method;
 
-        foreach ($ref->getParameters() as $param) {
+        if (!isset(self::$methodCache[$cacheKey])) {
+            self::$methodCache[$cacheKey] = new \ReflectionMethod($controller, $method);
+            self::$paramCache[$cacheKey]  = self::$methodCache[$cacheKey]->getParameters();
+        }
+
+        $ref  = self::$methodCache[$cacheKey];
+        $args = [];
+
+        foreach (self::$paramCache[$cacheKey] as $param) {
             $name = $param->getName();
             $type = $param->getType();
 
