@@ -1,0 +1,18 @@
+{
+    "name": "nexphant/foundation",
+    "description": "Nexphant Foundation - Container, DI, and core framework internals",
+    "type": "library",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Nexphant\\Foundation\\": "src/"
+        }
+    },
+    "require": {
+        "php": "^8.1",
+        "nexphant/support": "^0.0",
+        "nexphant/validation": "^0.0"
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
